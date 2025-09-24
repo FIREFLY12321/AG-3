@@ -17,7 +17,7 @@ permissions:
 jobs:
   update-readme:
     runs-on: ubuntu-latest
-    
+    environment: production    # ENVIRONMET SETTING！！！
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -116,3 +116,27 @@ jobs:
         fi
       env:
         GH_TOKEN: ${{ secrets.REPO_TOKEN }}
+    - name: Secure commit operation
+      run: |
+        # ❌ 錯誤：可能洩露token
+        # echo "Token: ${{ secrets.REPO_TOKEN }}"
+        
+        # ✅ 正確：不打印敏感資料
+        if [ -z "${{ secrets.REPO_TOKEN }}" ]; then
+          echo "❌ REPO_TOKEN not configured"
+          exit 1
+        fi
+        
+        # 設定git但不顯示credential
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # ❌ 錯誤：會在log中顯示API回應
+        # curl -H "Authorization: token ${{ secrets.REPO_TOKEN }}" https://api.github.com/user
+        
+        # ✅ 正確：使用gh CLI且不顯示回應
+        gh auth status > /dev/null 2>&1
+      env:
+        GH_TOKEN: ${{ secrets.REPO_TOKEN }}
+
+        

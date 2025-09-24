@@ -1,0 +1,92 @@
+name: Update README with Recent Activity
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    # Run daily at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.REPO_TOKEN }}
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Get recent commits
+      id: commits
+      run: |
+        echo "commits<<EOF" >> $GITHUB_OUTPUT
+        git log --oneline -10 --pretty=format:"- %h: %s (%an, %ar)" >> $GITHUB_OUTPUT
+        echo "" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Get repository stats
+      id: stats
+      run: |
+        COMMIT_COUNT=$(git rev-list --count HEAD)
+        LAST_COMMIT=$(git log -1 --pretty=format:"%ar")
+        echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+        echo "last_commit=$LAST_COMMIT" >> $GITHUB_OUTPUT
+    
+    - name: Update README
+      run: |
+        # Create updated activity section
+        cat > activity_section.md << EOF
+        <!-- ACTIVITY_START -->
+        **Last Updated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        
+        **Repository Stats:**
+        - Total Commits: ${{ steps.stats.outputs.commit_count }}
+        - Last Commit: ${{ steps.stats.outputs.last_commit }}
+        
+        **Recent Commits:**
+        ${{ steps.commits.outputs.commits }}
+        <!-- ACTIVITY_END -->
+        EOF
+        
+        # Replace the section in README
+        awk '
+        /<!-- ACTIVITY_START -->/ { p=1 }
+        p==0 { print }
+        /<!-- ACTIVITY_END -->/ { 
+          while ((getline line < "activity_section.md") > 0) print line
+          p=0
+        }' README.md > README_new.md
+        
+        mv README_new.md README.md
+        rm activity_section.md
+    
+    - name: Check for changes
+      id: verify-changed-files
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Commit changes
+      if: steps.verify-changed-files.outputs.changed == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add README.md    
+        git commit -m "🤖 Auto-update README with recent activity"
+        git push
+        

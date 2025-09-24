@@ -8,9 +8,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  actions: read
-  issues: write
+  contents: write # 只能寫入內容
+  actions: read # 只能讀取actions
+  issues: write # 只能操作issues
+  # 明確不給其他權限😤😤（霸氣
+  
 
 jobs:
   update-readme:

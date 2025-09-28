@@ -4,18 +4,20 @@ on:
   push:
     branches: [ main ]
   schedule:
-    # Run daily at 6 AM UTC
     - cron: '0 6 * * *'
   workflow_dispatch:
 
 permissions:
-  contents: write
-  actions: read
+  contents: write # 只能寫入內容
+  actions: read # 只能讀取actions
+  issues: write # 只能操作issues
+  # 明確不給其他權限😤😤（霸氣
+  
 
 jobs:
   update-readme:
     runs-on: ubuntu-latest
-    
+    environment: production    # ENVIRONMET SETTING！！！
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -71,6 +73,21 @@ jobs:
         
         mv README_new.md README.md
         rm activity_section.md
+
+    # 👇 在這裡添加 status badge 步驟
+    - name: Update status badges
+      run: |
+        # Add workflow status badge if not already present
+        if ! grep -q "Auto-Update.*badge\.svg" README.md; then
+          # Create a temporary file with the badge at the top
+          echo "![Auto-Update Status](https://github.com/${{ github.repository }}/workflows/Update%20README%20with%20Recent%20Activity/badge.svg)" > temp_readme.md
+          echo "" >> temp_readme.md
+          cat README.md >> temp_readme.md
+          mv temp_readme.md README.md
+        fi
+        
+        # Add last updated badge
+        sed -i 's|!\[Auto-Update Status\].*|![Auto-Update Status](https://github.com/${{ github.repository }}/workflows/Update%20README%20with%20Recent%20Activity/badge.svg) ![Last Updated](https://img.shields.io/badge/Last%20Updated-$(date -u +%Y--%m--%d)-blue)|' README.md
     
     - name: Check for changes
       id: verify-changed-files
@@ -86,7 +103,40 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add README.md    
-        git commit -m "🤖 Auto-update README with recent activity"
+        git add README.md
+        git commit -m "🤖 Auto-update README with recent activity and badges"
         git push
+    
+    - name: Close linked issue on merge
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        ISSUE_NUM=$(git log --oneline -1 | grep -o '#[0-9]\+' | head -1 | sed 's/#//')
+        if [ ! -z "$ISSUE_NUM" ]; then
+          gh issue close $ISSUE_NUM --comment "🎉 Automatically closed by merge to main"
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.REPO_TOKEN }}
+    - name: Secure commit operation
+      run: |
+        # ❌ 錯誤：可能洩露token
+        # echo "Token: ${{ secrets.REPO_TOKEN }}"
+        
+        # ✅ 正確：不打印敏感資料
+        if [ -z "${{ secrets.REPO_TOKEN }}" ]; then
+          echo "❌ REPO_TOKEN not configured"
+          exit 1
+        fi
+        
+        # 設定git但不顯示credential
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # ❌ 錯誤：會在log中顯示API回應
+        # curl -H "Authorization: token ${{ secrets.REPO_TOKEN }}" https://api.github.com/user
+        
+        # ✅ 正確：使用gh CLI且不顯示回應
+        gh auth status > /dev/null 2>&1
+      env:
+        GH_TOKEN: ${{ secrets.REPO_TOKEN }}
+
         

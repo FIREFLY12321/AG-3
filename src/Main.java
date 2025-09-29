@@ -3,3 +3,4 @@ public class Main {
         System.out.println("Hello, World!");
     }
 }
+//test: validate auto-close feature (#2)"  # 用你的issue編號

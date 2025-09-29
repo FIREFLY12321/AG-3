@@ -110,9 +110,13 @@ jobs:
     - name: Close linked issue on merge
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
+        # Extract issue number from commit message
         ISSUE_NUM=$(git log --oneline -1 | grep -o '#[0-9]\+' | head -1 | sed 's/#//')
         if [ ! -z "$ISSUE_NUM" ]; then
           gh issue close $ISSUE_NUM --comment "🎉 Automatically closed by merge to main"
+          echo "✅ Issue #$ISSUE_NUM closed automatically"
+        else
+          echo "ℹ️ No issue number found in commit message"
         fi
       env:
         GH_TOKEN: ${{ secrets.REPO_TOKEN }}

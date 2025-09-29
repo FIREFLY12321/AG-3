@@ -20,4 +20,14 @@ public class VaccineTweetAnalyzer {
         List<HashMap<String, Integer>> results = processor.getLineWordCounts();
         // 可以再做更多處理，例如存檔或分析
     }
-}//hello branch1
+}
+/*
+
+
+hello
+hello
+
+
+test
+
+ */
